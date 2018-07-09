@@ -6,14 +6,7 @@ tx := Tx{chunkSize: 8000000, packetSize: 1000}
 fd := tx.add(string identifier, io.ReaderAt r, int64 fileSize)
 sendToReceivers(fd)
 
-fd.activate(int weight)
-tx.activate(fd, int weight)
-
-fd.activate()
-tx.activate(fd)
-
-fd.deactivate()
-tx.deactivate(fd)
+tx.activate(fd, int weightage)
 
 while tx.active() {
   p := tx.packet()
