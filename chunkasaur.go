@@ -6,8 +6,9 @@ type Transmitter struct {
 }
 
 func (tx *Transmitter) AddFile(id string, r io.ReaderAt, fileSize int64) (fd File) { return }
-func (tx *Transmitter) ActivateChunk(cd Chunk, weight int)                         {}
-func (tx *Transmitter) DeactivateChunk(cd Chunk)                                   {}
+func (tx *Transmitter) ActivateChunk(cd Chunk)                                     { tx.ActivateChunkWithWeight(cd, 1) }
+func (tx *Transmitter) ActivateChunkWithWeight(cd Chunk, weight int)               {}
+func (tx *Transmitter) DeactivateChunk(cd Chunk)                                   { tx.ActivateChunkWithWeight(cd, 0) }
 func (tx *Transmitter) GeneratePacket() (pck Packet)                               { return }
 
 type Receiver struct {
