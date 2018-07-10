@@ -10,8 +10,9 @@ import (
 )
 
 func TestSingleChunkTransmission(t *testing.T) {
-	Size := 1000
-	PacketSize := 10
+	Size := 100000
+	PacketSize := 100
+	TransmissionBuffer := 10
 	sourceFile := generateRandomFile("source", Size)
 	sourceFileInfo, _ := sourceFile.Stat()
 	defer os.Remove(sourceFile.Name())
@@ -22,14 +23,14 @@ func TestSingleChunkTransmission(t *testing.T) {
 	t.Log(destinationFile.Name())
 
 	tx := NewTransmitter()
-	sourceFileTxInfo := tx.AddFile("s1", sourceFile, uint64(sourceFileInfo.Size()))
-	tx.ActivateChunk(ChunkInfo{FileInfo: sourceFileTxInfo, Size: sourceFileTxInfo.Size, Offset: 0, PacketSize: uint64(PacketSize)})
+	sourceFileTxInfo := tx.AddFile("s1", sourceFile, int64(sourceFileInfo.Size()))
+	tx.ActivateChunk(Chunk{FileInfo: sourceFileTxInfo, Size: sourceFileTxInfo.Size, Offset: 0, PacketSize: int64(PacketSize)})
 
 	rx := NewReceiver()
 	rx.PrepareForReception(sourceFileTxInfo, destinationFile)
 
-	// Run for packet size plus a generous extra
-	for i := 0; i <= ((Size * 4) / PacketSize); i++ {
+	// Run for symbol count plus a buffer
+	for i := 0; i <= (Size/PacketSize)+TransmissionBuffer; i++ {
 		rx.Receive(tx.GeneratePacket())
 	}
 	destinationFile.Sync()
