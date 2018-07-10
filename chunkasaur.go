@@ -6,7 +6,7 @@ import (
 )
 
 type Transmitter struct {
-	readers           map[FileInfo]io.ReaderAt
+	readers           map[Object]io.ReaderAt
 	chunkBlocks       map[Chunk][]fountain.LTBlock
 	packetIndex       int64
 	chunkBlockIndexes map[Chunk]int64
@@ -14,21 +14,21 @@ type Transmitter struct {
 
 func NewTransmitter() *Transmitter {
 	return &Transmitter{
-		readers:           make(map[FileInfo]io.ReaderAt),
+		readers:           make(map[Object]io.ReaderAt),
 		chunkBlocks:       make(map[Chunk][]fountain.LTBlock),
 		chunkBlockIndexes: make(map[Chunk]int64),
 	}
 }
 
-func (tx *Transmitter) AddFile(id string, r io.ReaderAt, fileSize int64) (f FileInfo) {
-	f.ID = id
-	f.Size = fileSize
-	tx.readers[f] = r
+func (tx *Transmitter) AddFile(id string, r io.ReaderAt, fileSize int64) (o Object) {
+	o.ID = id
+	o.Size = fileSize
+	tx.readers[o] = r
 	return
 }
 func (tx *Transmitter) ActivateChunkWithWeight(chunk Chunk, weight int) {
-	data := make([]byte, chunk.Size)                      // Set up a buffer with chunk size
-	tx.readers[chunk.FileInfo].ReadAt(data, chunk.Offset) // and read that data from the file
+	data := make([]byte, chunk.Size)
+	tx.readers[chunk.FileInfo].ReadAt(data, chunk.Offset)
 	ids := buildIds(chunk.targetBlockCount())
 	tx.chunkBlocks[chunk] = fountain.EncodeLTBlocks(data, ids, chunk.codec())
 }
@@ -44,13 +44,15 @@ func (tx *Transmitter) ActivateChunk(chunk Chunk)   { tx.ActivateChunkWithWeight
 func (tx *Transmitter) DeactivateChunk(chunk Chunk) {}
 
 func (tx *Transmitter) chooseChunk() Chunk {
-	var allActiveChunks []Chunk
-	for c := range tx.chunkBlocks { // Not optimal, but good enough since N is usually small
-		allActiveChunks = append(allActiveChunks, c)
-	}
-	idx := tx.packetIndex % int64(len(allActiveChunks))
+	idx := tx.packetIndex % int64(len(tx.chunkBlocks))
 	tx.packetIndex++
-	return allActiveChunks[idx]
+	return tx.activeChunks()[idx]
+}
+func (tx *Transmitter) activeChunks() (activeChunks []Chunk) {
+	for c := range tx.chunkBlocks { // Not optimal, but good enough since N is usually small
+		activeChunks = append(activeChunks, c)
+	}
+	return
 }
 func (tx *Transmitter) chooseBlockIndex(chunk Chunk) int64 {
 	idx := tx.chunkBlockIndexes[chunk] % int64(len(tx.chunkBlocks[chunk]))
@@ -67,21 +69,21 @@ func buildIds(count int64) []int64 {
 }
 
 type Receiver struct {
-	writers        map[FileInfo]io.WriterAt
+	writers        map[Object]io.WriterAt
 	chunkDecoders  map[Chunk]fountain.Decoder
 	finishedChunks map[Chunk]struct{}
 }
 
 func NewReceiver() *Receiver {
 	return &Receiver{
-		writers:        make(map[FileInfo]io.WriterAt),
+		writers:        make(map[Object]io.WriterAt),
 		chunkDecoders:  make(map[Chunk]fountain.Decoder),
 		finishedChunks: make(map[Chunk]struct{}),
 	}
 }
 
-func (rx *Receiver) PrepareForReception(f FileInfo, w io.WriterAt) {
-	rx.writers[f] = w
+func (rx *Receiver) PrepareForReception(o Object, w io.WriterAt) {
+	rx.writers[o] = w
 }
 func (rx *Receiver) Receive(packet Packet) {
 	if _, done := rx.finishedChunks[packet.Chunk]; done {
@@ -98,13 +100,13 @@ func (rx *Receiver) Receive(packet Packet) {
 	}
 }
 
-type FileInfo struct {
+type Object struct {
 	ID   string
 	Size int64
 }
 
 type Chunk struct {
-	FileInfo   FileInfo
+	FileInfo   Object
 	Size       int64
 	Offset     int64
 	PacketSize int64

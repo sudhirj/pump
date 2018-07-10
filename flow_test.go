@@ -12,30 +12,36 @@ import (
 func TestSingleChunkTransmission(t *testing.T) {
 	Size := 100000
 	PacketSize := 100
+	SymbolCount := Size / PacketSize
 	TransmissionBuffer := 10
+
 	sourceFile := generateRandomFile("source", Size)
-	sourceFileInfo, _ := sourceFile.Stat()
 	defer os.Remove(sourceFile.Name())
-	t.Log(sourceFile.Name())
 
 	destinationFile := makeFile("destination")
 	defer os.Remove(destinationFile.Name())
-	t.Log(destinationFile.Name())
 
 	tx := NewTransmitter()
-	sourceFileTxInfo := tx.AddFile("s1", sourceFile, int64(sourceFileInfo.Size()))
+	sourceFileTxInfo := tx.AddFile("s1", sourceFile, int64(Size))
 	tx.ActivateChunk(Chunk{FileInfo: sourceFileTxInfo, Size: sourceFileTxInfo.Size, Offset: 0, PacketSize: int64(PacketSize)})
 
 	rx := NewReceiver()
 	rx.PrepareForReception(sourceFileTxInfo, destinationFile)
 
 	// Run for symbol count plus a buffer
-	for i := 0; i <= (Size/PacketSize)+TransmissionBuffer; i++ {
+
+	for i := 0; i <= SymbolCount+TransmissionBuffer; i++ {
 		rx.Receive(tx.GeneratePacket())
 	}
-	destinationFile.Sync()
-	destinationFileInfo, _ := destinationFile.Stat()
 
+	assertEquality(t, sourceFile, destinationFile)
+}
+
+func assertEquality(t *testing.T, sourceFile, destinationFile *os.File) {
+	sourceFile.Sync()
+	destinationFile.Sync()
+	sourceFileInfo, _ := destinationFile.Stat()
+	destinationFileInfo, _ := destinationFile.Stat()
 	if sourceFileInfo.Size() != destinationFileInfo.Size() {
 		t.Error("Files ought to be same size, but source was", sourceFileInfo.Size(), "and destination was ", destinationFileInfo.Size())
 	}
@@ -51,7 +57,6 @@ func TestSingleChunkTransmission(t *testing.T) {
 		}
 		t.Error("File data was not equal, diffcount", diffCount)
 	}
-
 }
 
 func generateRandomFile(prefix string, size int) (*os.File) {
