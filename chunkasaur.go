@@ -29,8 +29,8 @@ func (tx *Transmitter) AddFile(id string, r io.ReaderAt, fileSize uint64) (fd Fi
 func (tx *Transmitter) ActivateChunkWithWeight(cd ChunkInfo, weight int) {
 	data := make([]byte, cd.Size)                          // Set up a buffer with chunk size
 	tx.readers[cd.FileInfo].ReadAt(data, int64(cd.Offset)) // and read that data from the file
-	ids := buildIds(cd.TargetBlockCount())
-	tx.chunks[cd] = fountain.EncodeLTBlocks(data, ids, cd.Codec())
+	ids := buildIds(cd.targetBlockCount())
+	tx.chunks[cd] = fountain.EncodeLTBlocks(data, ids, cd.codec())
 }
 
 func buildIds(count int64) []int64 {
@@ -90,7 +90,7 @@ func (rx *Receiver) Receive(pck Packet) {
 		return
 	}
 	if _, present := rx.chunkDecoders[pck.ChunkInfo]; !present {
-		rx.chunkDecoders[pck.ChunkInfo] = pck.ChunkInfo.Decoder()
+		rx.chunkDecoders[pck.ChunkInfo] = pck.ChunkInfo.decoder()
 	}
 
 	if rx.chunkDecoders[pck.ChunkInfo].AddBlocks([]fountain.LTBlock{pck.Block}) {
@@ -112,17 +112,17 @@ type ChunkInfo struct {
 	PacketSize uint64
 }
 
-func (c ChunkInfo) SourceBlockCount() int64 {
+func (c ChunkInfo) sourceBlockCount() int64 {
 	return int64(float64(c.Size / c.PacketSize))
 }
-func (c ChunkInfo) Decoder() fountain.Decoder {
-	return fountain.NewRaptorCodec(int(c.SourceBlockCount()), 8).NewDecoder(int(c.Size))
+func (c ChunkInfo) decoder() fountain.Decoder {
+	return fountain.NewRaptorCodec(int(c.sourceBlockCount()), 8).NewDecoder(int(c.Size))
 }
-func (c ChunkInfo) Codec() fountain.Codec {
-	return fountain.NewRaptorCodec(int(c.SourceBlockCount()), 8)
+func (c ChunkInfo) codec() fountain.Codec {
+	return fountain.NewRaptorCodec(int(c.sourceBlockCount()), 8)
 }
-func (c ChunkInfo) TargetBlockCount() int64 {
-	return int64(float64(c.SourceBlockCount()) * 1.1)
+func (c ChunkInfo) targetBlockCount() int64 {
+	return int64(float64(c.sourceBlockCount()) * 1.1)
 }
 
 type Packet struct {

@@ -29,7 +29,7 @@ func TestSingleChunkTransmission(t *testing.T) {
 	rx.PrepareForReception(sourceFileTxInfo, destinationFile)
 
 	// Run for packet size plus a generous extra
-	for i := 0; i <= ((Size * 2) / PacketSize); i++ {
+	for i := 0; i <= ((Size * 4) / PacketSize); i++ {
 		rx.Receive(tx.GeneratePacket())
 	}
 	destinationFile.Sync()
