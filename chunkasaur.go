@@ -3,19 +3,20 @@ package chunkasaur
 import (
 	"io"
 	"github.com/google/gofountain"
-	"math/rand"
-	"log"
 )
 
 type Transmitter struct {
-	readers map[FileInfo]io.ReaderAt
-	chunks  map[ChunkInfo][]fountain.LTBlock
+	readers           map[FileInfo]io.ReaderAt
+	chunks            map[ChunkInfo][]fountain.LTBlock
+	packetIndex       int64
+	chunkBlockIndexes map[ChunkInfo]int64
 }
 
 func NewTransmitter() *Transmitter {
 	return &Transmitter{
-		readers: make(map[FileInfo]io.ReaderAt),
-		chunks:  make(map[ChunkInfo][]fountain.LTBlock),
+		readers:           make(map[FileInfo]io.ReaderAt),
+		chunks:            make(map[ChunkInfo][]fountain.LTBlock),
+		chunkBlockIndexes: make(map[ChunkInfo]int64),
 	}
 }
 
@@ -26,12 +27,10 @@ func (tx *Transmitter) AddFile(id string, r io.ReaderAt, fileSize uint64) (fd Fi
 	return
 }
 func (tx *Transmitter) ActivateChunkWithWeight(cd ChunkInfo, weight int) {
-	data := make([]byte, cd.Size)                                // Set up a buffer with chunk size
-	tx.readers[cd.FileInfo].ReadAt(data, int64(cd.Offset))       // and read that data from the file
-	ids := buildIds(int64(float64(cd.SourceBlockCount()) * 1.5)) // make more blocks than necessary
-	raptorCodec := fountain.NewRaptorCodec(int(cd.SourceBlockCount()), 4)
-	tx.chunks[cd] = fountain.EncodeLTBlocks(data, ids, raptorCodec)
-	log.Println(tx.chunks[cd])
+	data := make([]byte, cd.Size)                          // Set up a buffer with chunk size
+	tx.readers[cd.FileInfo].ReadAt(data, int64(cd.Offset)) // and read that data from the file
+	ids := buildIds(cd.TargetBlockCount())
+	tx.chunks[cd] = fountain.EncodeLTBlocks(data, ids, cd.Codec())
 }
 
 func buildIds(count int64) []int64 {
@@ -58,10 +57,15 @@ func (tx *Transmitter) chooseChunk() ChunkInfo {
 	for c := range tx.chunks {
 		allActiveChunks[i] = c
 	}
-	return allActiveChunks[rand.Int63n(int64(len(allActiveChunks)))]
+	idx := tx.packetIndex % int64(len(allActiveChunks))
+	tx.packetIndex++
+	return allActiveChunks[idx]
 }
 func (tx *Transmitter) chooseBlockIndex(cd ChunkInfo) int64 {
-	return rand.Int63n(int64(len(tx.chunks[cd])))
+	idx := tx.chunkBlockIndexes[cd]
+	tx.chunkBlockIndexes[cd]++
+	return idx % int64(len(tx.chunks[cd]))
+
 }
 
 type Receiver struct {
@@ -85,7 +89,7 @@ func (rx *Receiver) Receive(pck Packet) {
 	if _, done := rx.finishedChunks[pck.ChunkInfo]; done {
 		return
 	}
-	if _, present := rx.chunkDecoders[pck.ChunkInfo]; !present{
+	if _, present := rx.chunkDecoders[pck.ChunkInfo]; !present {
 		rx.chunkDecoders[pck.ChunkInfo] = pck.ChunkInfo.Decoder()
 	}
 
@@ -112,7 +116,13 @@ func (c ChunkInfo) SourceBlockCount() int64 {
 	return int64(float64(c.Size / c.PacketSize))
 }
 func (c ChunkInfo) Decoder() fountain.Decoder {
-	return fountain.NewRaptorCodec(int(c.SourceBlockCount()), 4).NewDecoder(int(c.Size))
+	return fountain.NewRaptorCodec(int(c.SourceBlockCount()), 8).NewDecoder(int(c.Size))
+}
+func (c ChunkInfo) Codec() fountain.Codec {
+	return fountain.NewRaptorCodec(int(c.SourceBlockCount()), 8)
+}
+func (c ChunkInfo) TargetBlockCount() int64 {
+	return int64(float64(c.SourceBlockCount()) * 1.1)
 }
 
 type Packet struct {

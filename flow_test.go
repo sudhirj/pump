@@ -10,7 +10,9 @@ import (
 )
 
 func TestSingleChunkTransmission(t *testing.T) {
-	sourceFile := generateRandomFile("source", 100)
+	Size := 1000
+	PacketSize := 10
+	sourceFile := generateRandomFile("source", Size)
 	sourceFileInfo, _ := sourceFile.Stat()
 	defer os.Remove(sourceFile.Name())
 	t.Log(sourceFile.Name())
@@ -21,13 +23,13 @@ func TestSingleChunkTransmission(t *testing.T) {
 
 	tx := NewTransmitter()
 	sourceFileTxInfo := tx.AddFile("s1", sourceFile, uint64(sourceFileInfo.Size()))
-	tx.ActivateChunk(ChunkInfo{FileInfo: sourceFileTxInfo, Size: sourceFileTxInfo.Size, Offset: 0, PacketSize: 10})
+	tx.ActivateChunk(ChunkInfo{FileInfo: sourceFileTxInfo, Size: sourceFileTxInfo.Size, Offset: 0, PacketSize: uint64(PacketSize)})
 
 	rx := NewReceiver()
 	rx.PrepareForReception(sourceFileTxInfo, destinationFile)
 
 	// Run for packet size plus a generous extra
-	for i := 0; i <= 10000; i++ {
+	for i := 0; i <= ((Size * 2) / PacketSize); i++ {
 		rx.Receive(tx.GeneratePacket())
 	}
 	destinationFile.Sync()
@@ -40,9 +42,13 @@ func TestSingleChunkTransmission(t *testing.T) {
 	sourceData, _ := ioutil.ReadFile(sourceFile.Name())
 	destinationData, _ := ioutil.ReadFile(destinationFile.Name())
 	if !bytes.Equal(sourceData, destinationData) {
-		t.Error(sourceData)
-		t.Error(destinationData)
-		t.Error("File data was not equal")
+		diffCount := 0
+		for _, i := range sourceData {
+			if sourceData[i] != destinationData[i] {
+				diffCount++
+			}
+		}
+		t.Error("File data was not equal, diffcount", diffCount)
 	}
 
 }
