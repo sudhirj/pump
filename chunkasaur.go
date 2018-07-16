@@ -29,8 +29,7 @@ func (tx *Transmitter) AddFile(id string, r io.ReaderAt, fileSize int64) (o Obje
 func (tx *Transmitter) ActivateChunkWithWeight(chunk Chunk, weight int) {
 	data := make([]byte, chunk.Size)
 	tx.readers[chunk.FileInfo].ReadAt(data, chunk.Offset)
-	ids := buildIds(chunk.targetBlockCount())
-	tx.chunkBlocks[chunk] = fountain.EncodeLTBlocks(data, ids, chunk.codec())
+	tx.chunkBlocks[chunk] = chunk.encode(data)
 }
 func (tx *Transmitter) GeneratePacket() (packet Packet) {
 	chosenChunk := tx.chooseChunk()
@@ -59,13 +58,6 @@ func (tx *Transmitter) chooseBlockIndex(chunk Chunk) int64 {
 	tx.chunkBlockIndexes[chunk]++
 	return idx
 
-}
-func buildIds(count int64) []int64 {
-	ids := make([]int64, count)
-	for i := 0; i < len(ids); i++ {
-		ids[i] = int64(i)
-	}
-	return ids
 }
 
 type Receiver struct {
@@ -96,7 +88,7 @@ func (rx *Receiver) Receive(packet Packet) {
 	if rx.chunkDecoders[packet.Chunk].AddBlocks([]fountain.LTBlock{packet.Block}) {
 		rx.writers[packet.Chunk.FileInfo].WriteAt(rx.chunkDecoders[packet.Chunk].Decode(), packet.Chunk.Offset)
 		rx.finishedChunks[packet.Chunk] = struct{}{}
-		delete(rx.chunkDecoders, packet.Chunk)
+		delete(rx.chunkDecoders, packet.Chunk) // remove the decoder immediately if the block is finished to avoid corruption
 	}
 }
 
@@ -122,7 +114,17 @@ func (c Chunk) codec() fountain.Codec {
 	return fountain.NewRaptorCodec(int(c.sourceBlockCount()), 8)
 }
 func (c Chunk) targetBlockCount() int64 {
-	return c.sourceBlockCount() + 5
+	return c.sourceBlockCount() + 5 // Add a small buffer to allow for Raptor block overflow
+}
+func (c Chunk) encode(data []byte) []fountain.LTBlock {
+	return fountain.EncodeLTBlocks(data, c.buildIds(), c.codec())
+}
+func (c Chunk) buildIds() []int64 {
+	ids := make([]int64, c.targetBlockCount())
+	for i := 0; i < len(ids); i++ {
+		ids[i] = int64(i)
+	}
+	return ids
 }
 
 type Packet struct {
