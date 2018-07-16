@@ -2,77 +2,65 @@ package chunkasaur
 
 import (
 	"testing"
-	"io/ioutil"
 	"math/rand"
 	"time"
-	"os"
 	"bytes"
+	"io"
 )
 
 func TestSingleChunkTransmission(t *testing.T) {
+
 	Size := 100000
+	virtualFile1 := newVirtualFile(int64(Size))
 	PacketSize := 100
 	SymbolCount := Size / PacketSize
-	TransmissionBuffer := 10
-
-	sourceFile := generateRandomFile("source", Size)
-	defer os.Remove(sourceFile.Name())
-
-	destinationFile := makeFile("destination")
-	defer os.Remove(destinationFile.Name())
+	EncodingBuffer := 10
 
 	tx := NewTransmitter()
-	sourceFileTxInfo := tx.AddFile("s1", sourceFile, int64(Size))
+	sourceFileTxInfo := tx.AddFile("s1", virtualFile1, int64(Size))
 	tx.ActivateChunk(Chunk{FileInfo: sourceFileTxInfo, Size: sourceFileTxInfo.Size, Offset: 0, PacketSize: int64(PacketSize)})
 
 	rx := NewReceiver()
-	rx.PrepareForReception(sourceFileTxInfo, destinationFile)
+	rx.PrepareForReception(sourceFileTxInfo, virtualFile1)
 
-	// Run for symbol count plus a buffer
-
-	for i := 0; i <= SymbolCount+TransmissionBuffer; i++ {
+	for i := 0; i <= SymbolCount+EncodingBuffer; i++ {
 		rx.Receive(tx.GeneratePacket())
 	}
-
-	assertEquality(t, sourceFile, destinationFile)
+	virtualFile1.Validate(t)
 }
 
-func assertEquality(t *testing.T, sourceFile, destinationFile *os.File) {
-	sourceFile.Sync()
-	destinationFile.Sync()
-	sourceFileInfo, _ := destinationFile.Stat()
-	destinationFileInfo, _ := destinationFile.Stat()
-	if sourceFileInfo.Size() != destinationFileInfo.Size() {
-		t.Error("Files ought to be same size, but source was", sourceFileInfo.Size(), "and destination was ", destinationFileInfo.Size())
-	}
+type virtualFile struct {
+	source      []byte
+	destination []byte
+	io.ReaderAt
+	io.WriterAt
+}
 
-	sourceData, _ := ioutil.ReadFile(sourceFile.Name())
-	destinationData, _ := ioutil.ReadFile(destinationFile.Name())
-	if !bytes.Equal(sourceData, destinationData) {
+func newVirtualFile(size int64) (vf *virtualFile) {
+	vf = &virtualFile{
+		source:      make([]byte, size),
+		destination: make([]byte, size),
+	}
+	rand.Seed(time.Now().UnixNano())
+	rand.Read(vf.source)
+	return
+}
+
+func (vf *virtualFile) ReadAt(p []byte, off int64) (n int, err error) {
+	return bytes.NewReader(vf.source).ReadAt(p, off)
+}
+func (vf *virtualFile) WriteAt(p []byte, off int64) (n int, err error) {
+	copy(vf.destination[int(off):], p)
+	return len(p), nil
+}
+func (vf *virtualFile) Validate(t *testing.T) {
+	if !bytes.Equal(vf.source, vf.destination) {
 		diffCount := 0
-		for _, i := range sourceData {
-			if sourceData[i] != destinationData[i] {
+		for _, i := range vf.source {
+			if vf.source[i] != vf.destination[i] {
 				diffCount++
 			}
 		}
 		t.Error("File data was not equal, diffcount", diffCount)
 	}
-}
-
-func generateRandomFile(prefix string, size int) (*os.File) {
-	sourceFile := makeFile(prefix)
-	sourceFile.Write(randomBytes(size))
-	sourceFile.Sync()
-	return sourceFile
-}
-
-func makeFile(prefix string) (*os.File) {
-	sourceFile, _ := ioutil.TempFile("", prefix)
-	return sourceFile
-}
-func randomBytes(num int) []byte {
-	rand.Seed(time.Now().UnixNano())
-	holder := make([]byte, num)
-	rand.Read(holder)
-	return holder
 }
