@@ -9,7 +9,6 @@ import (
 )
 
 func TestSingleChunkTransmission(t *testing.T) {
-
 	Size := 100000
 	virtualFile1 := newVirtualFile(int64(Size))
 	PacketSize := 100
@@ -29,15 +28,15 @@ func TestSingleChunkTransmission(t *testing.T) {
 	virtualFile1.Validate(t)
 }
 
-type virtualFile struct {
+type virtualTestFile struct {
 	source      []byte
 	destination []byte
 	io.ReaderAt
 	io.WriterAt
 }
 
-func newVirtualFile(size int64) (vf *virtualFile) {
-	vf = &virtualFile{
+func newVirtualFile(size int64) (vf *virtualTestFile) {
+	vf = &virtualTestFile{
 		source:      make([]byte, size),
 		destination: make([]byte, size),
 	}
@@ -46,14 +45,13 @@ func newVirtualFile(size int64) (vf *virtualFile) {
 	return
 }
 
-func (vf *virtualFile) ReadAt(p []byte, off int64) (n int, err error) {
+func (vf *virtualTestFile) ReadAt(p []byte, off int64) (n int, err error) {
 	return bytes.NewReader(vf.source).ReadAt(p, off)
 }
-func (vf *virtualFile) WriteAt(p []byte, off int64) (n int, err error) {
-	copy(vf.destination[int(off):], p)
-	return len(p), nil
+func (vf *virtualTestFile) WriteAt(p []byte, off int64) (n int, err error) {
+	return copy(vf.destination[int(off):], p), nil
 }
-func (vf *virtualFile) Validate(t *testing.T) {
+func (vf *virtualTestFile) Validate(t *testing.T) {
 	if !bytes.Equal(vf.source, vf.destination) {
 		diffCount := 0
 		for _, i := range vf.source {
