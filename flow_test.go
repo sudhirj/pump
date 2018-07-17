@@ -1,11 +1,11 @@
 package chunkasaur
 
 import (
-	"testing"
-	"math/rand"
-	"time"
 	"bytes"
 	"io"
+	"math/rand"
+	"testing"
+	"time"
 )
 
 func TestSingleChunkTransmission(t *testing.T) {
@@ -19,8 +19,8 @@ func TestSingleChunkTransmission(t *testing.T) {
 	tx := NewTransmitter()
 	sourceFileTxInfo1 := tx.AddFile("s1", virtualFile1, int64(Size))
 	sourceFileTxInfo2 := tx.AddFile("s2", virtualFile2, int64(Size))
-	tx.ActivateChunk(Chunk{FileInfo: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
-	tx.ActivateChunk(Chunk{FileInfo: sourceFileTxInfo2, Size: sourceFileTxInfo2.Size, Offset: 0, PacketSize: int64(PacketSize)})
+	tx.ActivateChunk(Chunk{ObjectInfo: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
+	tx.ActivateChunk(Chunk{ObjectInfo: sourceFileTxInfo2, Size: sourceFileTxInfo2.Size, Offset: 0, PacketSize: int64(PacketSize)})
 
 	rx := NewReceiver()
 	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
@@ -42,7 +42,7 @@ func TestPaddingOnOddSizedFiles(t *testing.T) {
 
 	tx := NewTransmitter()
 	sourceFileTxInfo1 := tx.AddFile("s1", virtualFile1, int64(Size))
-	tx.ActivateChunk(Chunk{FileInfo: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
+	tx.ActivateChunk(Chunk{ObjectInfo: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
 
 	rx := NewReceiver()
 	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
@@ -61,11 +61,11 @@ func TestMultiChunkTransmission(t *testing.T) {
 	tx := NewTransmitter()
 	evenTxInfo := tx.AddFile(evenFile.id, evenFile, evenFile.size())
 	oddTxInfo := tx.AddFile(oddFile.id, oddFile, oddFile.size())
-	tx.ActivateChunk(Chunk{FileInfo: evenTxInfo, Size: evenFile.size() / 2, Offset: 0, PacketSize: 100})
-	tx.ActivateChunk(Chunk{FileInfo: evenTxInfo, Size: evenFile.size() / 2, Offset: evenTxInfo.Size / 2, PacketSize: 100})
+	tx.ActivateChunk(Chunk{ObjectInfo: evenTxInfo, Size: evenFile.size() / 2, Offset: 0, PacketSize: 100})
+	tx.ActivateChunk(Chunk{ObjectInfo: evenTxInfo, Size: evenFile.size() / 2, Offset: evenTxInfo.Size / 2, PacketSize: 100})
 
-	tx.ActivateChunk(Chunk{FileInfo: oddTxInfo, Size: 8392, Offset: 0, PacketSize: 100})
-	tx.ActivateChunk(Chunk{FileInfo: oddTxInfo, Size: 3953, Offset: 8392, PacketSize: 100})
+	tx.ActivateChunk(Chunk{ObjectInfo: oddTxInfo, Size: 8392, Offset: 0, PacketSize: 100})
+	tx.ActivateChunk(Chunk{ObjectInfo: oddTxInfo, Size: 3953, Offset: 8392, PacketSize: 100})
 
 	rx := NewReceiver()
 	rx.PrepareForReception(evenTxInfo, evenFile)
@@ -83,7 +83,7 @@ type virtualTestFile struct {
 	destination []byte
 	io.ReaderAt
 	io.WriterAt
-	id          string
+	id string
 }
 
 func newVirtualFile(id string, size int64) (vf *virtualTestFile) {

@@ -1,8 +1,8 @@
 package chunkasaur
 
 import (
-	"io"
 	"github.com/google/gofountain"
+	"io"
 	"math"
 )
 
@@ -29,7 +29,7 @@ func (tx *Transmitter) AddFile(id string, r io.ReaderAt, fileSize int64) (o Obje
 }
 func (tx *Transmitter) ActivateChunkWithWeight(chunk Chunk, weight int) {
 	data := make([]byte, chunk.Size)
-	tx.readers[chunk.FileInfo].ReadAt(data, chunk.Offset)
+	tx.readers[chunk.ObjectInfo].ReadAt(data, chunk.Offset)
 	tx.chunkBlocks[chunk] = chunk.encode(data)
 }
 func (tx *Transmitter) GeneratePacket() (packet Packet) {
@@ -79,7 +79,7 @@ func (rx *Receiver) PrepareForReception(o Object, w io.WriterAt) {
 	rx.writers[o] = w
 }
 func (rx *Receiver) Receive(packet Packet) {
-	if _, registered := rx.writers[packet.Chunk.FileInfo]; !registered {
+	if _, registered := rx.writers[packet.Chunk.ObjectInfo]; !registered {
 		return
 	}
 	if _, alreadyFinished := rx.finishedChunks[packet.Chunk]; alreadyFinished {
@@ -91,7 +91,7 @@ func (rx *Receiver) Receive(packet Packet) {
 	if rx.chunkDecoders[packet.Chunk].AddBlocks([]fountain.LTBlock{packet.Block}) {
 		// Returns true if decoding of this chunk is complete
 		dataWithoutPadding := rx.chunkDecoders[packet.Chunk].Decode()[:packet.Chunk.Size]
-		rx.writers[packet.Chunk.FileInfo].WriteAt(dataWithoutPadding, packet.Chunk.Offset)
+		rx.writers[packet.Chunk.ObjectInfo].WriteAt(dataWithoutPadding, packet.Chunk.Offset)
 		rx.finishedChunks[packet.Chunk] = struct{}{}
 		delete(rx.chunkDecoders, packet.Chunk) // remove the decoder immediately to avoid corruption with more blocks
 	}
@@ -103,7 +103,7 @@ type Object struct {
 }
 
 type Chunk struct {
-	FileInfo   Object
+	ObjectInfo Object
 	Size       int64
 	Offset     int64
 	PacketSize int64
