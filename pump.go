@@ -2,106 +2,8 @@ package pump
 
 import (
 	"github.com/google/gofountain"
-	"io"
 	"math"
-	"sort"
 )
-
-type Transmitter struct {
-	readers           map[Object]io.ReaderAt
-	chunkBlocks       map[Chunk][]fountain.LTBlock
-	packetIndex       int64
-	chunkBlockIndexes map[Chunk]int64
-}
-
-func NewTransmitter() *Transmitter {
-	return &Transmitter{
-		readers:           make(map[Object]io.ReaderAt),
-		chunkBlocks:       make(map[Chunk][]fountain.LTBlock),
-		chunkBlockIndexes: make(map[Chunk]int64),
-	}
-}
-
-func (tx *Transmitter) AddObject(id string, r io.ReaderAt, totalSize int64) (o Object) {
-	o.ID = id
-	o.Size = totalSize
-	tx.readers[o] = r
-	return
-}
-func (tx *Transmitter) ActivateChunkWithWeight(chunk Chunk, weight int) {
-	data := make([]byte, chunk.Size)
-	tx.readers[chunk.Object].ReadAt(data, chunk.Offset)
-	tx.chunkBlocks[chunk] = chunk.encode(data)
-}
-func (tx *Transmitter) GeneratePacket() (packet Packet) {
-	chosenChunk := tx.chooseChunk()
-	chosenBlockIndex := tx.chooseBlockIndex(chosenChunk)
-	return Packet{
-		Chunk: chosenChunk,
-		Block: tx.chunkBlocks[chosenChunk][chosenBlockIndex],
-	}
-}
-func (tx *Transmitter) ActivateChunk(chunk Chunk)   { tx.ActivateChunkWithWeight(chunk, 1) }
-func (tx *Transmitter) DeactivateChunk(chunk Chunk) {}
-
-func (tx *Transmitter) chooseChunk() Chunk {
-	idx := tx.packetIndex % int64(len(tx.chunkBlocks))
-	tx.packetIndex++
-	return tx.activeChunks()[idx]
-}
-func (tx *Transmitter) activeChunks() (activeChunks []Chunk) {
-	for c := range tx.chunkBlocks { // Not optimal, but good enough since N is usually small
-		activeChunks = append(activeChunks, c)
-	}
-	sort.Slice(activeChunks, func(i, j int) bool {
-		return ((activeChunks[i].Object.ID == activeChunks[j].Object.ID) &&
-			(activeChunks[i].Offset < activeChunks[j].Offset)) ||
-			(activeChunks[i].Object.ID < activeChunks[j].Object.ID)
-	})
-	return
-}
-func (tx *Transmitter) chooseBlockIndex(chunk Chunk) int64 {
-	idx := tx.chunkBlockIndexes[chunk] % int64(len(tx.chunkBlocks[chunk]))
-	tx.chunkBlockIndexes[chunk]++
-	return idx
-
-}
-
-type Receiver struct {
-	writers        map[Object]io.WriterAt
-	chunkDecoders  map[Chunk]fountain.Decoder
-	finishedChunks map[Chunk]struct{}
-}
-
-func NewReceiver() *Receiver {
-	return &Receiver{
-		writers:        make(map[Object]io.WriterAt),
-		chunkDecoders:  make(map[Chunk]fountain.Decoder),
-		finishedChunks: make(map[Chunk]struct{}),
-	}
-}
-
-func (rx *Receiver) PrepareForReception(o Object, w io.WriterAt) {
-	rx.writers[o] = w
-}
-func (rx *Receiver) Receive(packet Packet) {
-	if _, registered := rx.writers[packet.Chunk.Object]; !registered {
-		return
-	}
-	if _, alreadyFinished := rx.finishedChunks[packet.Chunk]; alreadyFinished {
-		return
-	}
-	if _, present := rx.chunkDecoders[packet.Chunk]; !present {
-		rx.chunkDecoders[packet.Chunk] = packet.Chunk.decoder()
-	}
-	if rx.chunkDecoders[packet.Chunk].AddBlocks([]fountain.LTBlock{packet.Block}) {
-		// Returns true if decoding of this chunk is complete
-		dataWithoutPadding := rx.chunkDecoders[packet.Chunk].Decode()[:packet.Chunk.Size]
-		rx.writers[packet.Chunk.Object].WriteAt(dataWithoutPadding, packet.Chunk.Offset)
-		rx.finishedChunks[packet.Chunk] = struct{}{}
-		delete(rx.chunkDecoders, packet.Chunk) // remove the decoder immediately to avoid corruption with more blocks
-	}
-}
 
 type Object struct {
 	ID   string
@@ -115,11 +17,34 @@ type Chunk struct {
 	PacketSize int64
 }
 
+type ChunkDecoder struct {
+	Chunk    Chunk
+	decoder  fountain.Decoder
+	complete bool
+}
+
+func (cd *ChunkDecoder) Ingest(packet Packet) (finished bool) {
+	if cd.complete {
+		return
+	}
+	finished = cd.decoder.AddBlocks([]fountain.LTBlock{packet.Block})
+	if finished {
+		cd.complete = true
+	}
+	return
+}
+func (cd *ChunkDecoder) Data() []byte {
+	return cd.decoder.Decode()[:cd.Chunk.Size]
+}
+
 func (c Chunk) sourceBlockCount() int64 {
 	return int64(float64(c.paddedSize() / c.PacketSize))
 }
-func (c Chunk) decoder() fountain.Decoder {
-	return fountain.NewRaptorCodec(int(c.sourceBlockCount()), 8).NewDecoder(int(c.paddedSize()))
+func (c Chunk) decoder() *ChunkDecoder {
+	return &ChunkDecoder{
+		Chunk:   c,
+		decoder: c.codec().NewDecoder(int(c.paddedSize())),
+	}
 }
 func (c Chunk) codec() fountain.Codec {
 	return fountain.NewRaptorCodec(int(c.sourceBlockCount()), 8)
@@ -130,10 +55,13 @@ func (c Chunk) targetBlockCount() int64 {
 func (c Chunk) paddedSize() int64 {
 	return c.PacketSize * int64(math.Ceil(float64(c.Size)/float64(c.PacketSize)))
 }
-func (c Chunk) encode(data []byte) []fountain.LTBlock {
+func (c Chunk) encode(data []byte) (packets []Packet) {
 	necessaryPadding := c.paddedSize() - c.Size
 	paddedData := append(data, make([]byte, necessaryPadding)...)
-	return fountain.EncodeLTBlocks(paddedData, c.buildIds(), c.codec())
+	for _, ltBlock := range fountain.EncodeLTBlocks(paddedData, c.buildIds(), c.codec()) {
+		packets = append(packets, Packet{Chunk: c, Block: ltBlock})
+	}
+	return
 }
 func (c Chunk) buildIds() []int64 {
 	ids := make([]int64, c.targetBlockCount())
