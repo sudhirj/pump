@@ -79,6 +79,9 @@ func (rx *Receiver) PrepareForReception(o Object, w io.WriterAt) {
 	rx.writers[o] = w
 }
 func (rx *Receiver) Receive(packet Packet) {
+	if _, registered := rx.writers[packet.Chunk.FileInfo]; !registered {
+		return
+	}
 	if _, done := rx.finishedChunks[packet.Chunk]; done {
 		return
 	}

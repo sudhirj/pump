@@ -10,9 +10,9 @@ import (
 
 func TestSingleChunkTransmission(t *testing.T) {
 	Size := 1000000 // 1MB
-	virtualFile1 := newVirtualFile("f1",int64(Size))
-	virtualFile2 := newVirtualFile("f2",int64(Size))
-	PacketSize := 1000 // 1KB
+	virtualFile1 := newVirtualFile("f1", int64(Size))
+	virtualFile2 := newVirtualFile("f2", int64(Size))
+	PacketSize := 1000               // 1KB
 	SymbolCount := Size / PacketSize // 1000 packets
 	EncodingBuffer := 100
 
@@ -35,8 +35,8 @@ func TestSingleChunkTransmission(t *testing.T) {
 
 func TestPaddingOnOddSizedFiles(t *testing.T) {
 	Size := 12345
-	virtualFile1 := newVirtualFile("f1",int64(Size))
-	PacketSize := 89 // 1KB
+	virtualFile1 := newVirtualFile("f1", int64(Size))
+	PacketSize := 89                 // 1KB
 	SymbolCount := Size / PacketSize // 1000 packets
 	EncodingBuffer := 100
 
@@ -53,19 +53,44 @@ func TestPaddingOnOddSizedFiles(t *testing.T) {
 	virtualFile1.Validate(t)
 }
 
+func TestMultiChunkTransmission(t *testing.T) {
+
+	evenFile := newVirtualFile("even", int64(10000))
+	oddFile := newVirtualFile("odd", int64(12345))
+
+	tx := NewTransmitter()
+	evenTxInfo := tx.AddFile(evenFile.id, evenFile, evenFile.size())
+	oddTxInfo := tx.AddFile(oddFile.id, oddFile, oddFile.size())
+	tx.ActivateChunk(Chunk{FileInfo: evenTxInfo, Size: evenFile.size() / 2, Offset: 0, PacketSize: 100})
+	tx.ActivateChunk(Chunk{FileInfo: evenTxInfo, Size: evenFile.size() / 2, Offset: evenTxInfo.Size / 2, PacketSize: 100})
+
+	tx.ActivateChunk(Chunk{FileInfo: oddTxInfo, Size: 8392, Offset: 0, PacketSize: 100})
+	tx.ActivateChunk(Chunk{FileInfo: oddTxInfo, Size: 3953, Offset: 8392, PacketSize: 100})
+
+	rx := NewReceiver()
+	rx.PrepareForReception(evenTxInfo, evenFile)
+	rx.PrepareForReception(oddTxInfo, oddFile)
+
+	for i := 0; i <= int((evenFile.size()+oddFile.size())/100+1000); i++ {
+		rx.Receive(tx.GeneratePacket())
+	}
+	evenFile.Validate(t)
+	oddFile.Validate(t)
+}
+
 type virtualTestFile struct {
 	source      []byte
 	destination []byte
 	io.ReaderAt
 	io.WriterAt
-	id string
+	id          string
 }
 
-func newVirtualFile(id string,size int64) (vf *virtualTestFile) {
+func newVirtualFile(id string, size int64) (vf *virtualTestFile) {
 	vf = &virtualTestFile{
 		source:      make([]byte, size),
 		destination: make([]byte, size),
-		id: id,
+		id:          id,
 	}
 	rand.Seed(time.Now().UnixNano())
 	rand.Read(vf.source)
@@ -88,4 +113,7 @@ func (vf *virtualTestFile) Validate(t *testing.T) {
 		}
 		t.Error(vf.id, "File data was not equal, diffcount", diffCount)
 	}
+}
+func (vf *virtualTestFile) size() int64 {
+	return int64(len(vf.source))
 }
