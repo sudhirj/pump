@@ -3,7 +3,6 @@ package chunkasaur
 import (
 	"github.com/google/gofountain"
 	"io"
-	"log"
 	"math"
 	"sort"
 )
@@ -59,8 +58,6 @@ func (tx *Transmitter) activeChunks() (activeChunks []Chunk) {
 			(activeChunks[i].Offset < activeChunks[j].Offset)) ||
 			(activeChunks[i].ObjectInfo.ID < activeChunks[j].ObjectInfo.ID)
 	})
-	log.Println(activeChunks)
-
 	return
 }
 func (tx *Transmitter) chooseBlockIndex(chunk Chunk) int64 {
