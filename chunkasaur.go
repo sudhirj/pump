@@ -88,7 +88,7 @@ func (rx *Receiver) Receive(packet Packet) {
 	if rx.chunkDecoders[packet.Chunk].AddBlocks([]fountain.LTBlock{packet.Block}) {
 		rx.writers[packet.Chunk.FileInfo].WriteAt(rx.chunkDecoders[packet.Chunk].Decode(), packet.Chunk.Offset)
 		rx.finishedChunks[packet.Chunk] = struct{}{}
-		delete(rx.chunkDecoders, packet.Chunk) // remove the decoder immediately if the block is finished to avoid corruption
+		delete(rx.chunkDecoders, packet.Chunk) // remove the decoder immediately if the chunk is finished to avoid corruption
 	}
 }
 
@@ -121,7 +121,7 @@ func (c Chunk) encode(data []byte) []fountain.LTBlock {
 }
 func (c Chunk) buildIds() []int64 {
 	ids := make([]int64, c.targetBlockCount())
-	for i := 0; i < len(ids); i++ {
+	for i := range ids {
 		ids[i] = int64(i)
 	}
 	return ids
