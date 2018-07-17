@@ -3,6 +3,7 @@ package chunkasaur
 import (
 	"io"
 	"github.com/google/gofountain"
+	"math"
 )
 
 type Transmitter struct {
@@ -86,7 +87,8 @@ func (rx *Receiver) Receive(packet Packet) {
 	}
 
 	if rx.chunkDecoders[packet.Chunk].AddBlocks([]fountain.LTBlock{packet.Block}) {
-		rx.writers[packet.Chunk.FileInfo].WriteAt(rx.chunkDecoders[packet.Chunk].Decode(), packet.Chunk.Offset)
+		dataWithoutPadding := rx.chunkDecoders[packet.Chunk].Decode()[:packet.Chunk.Size]
+		rx.writers[packet.Chunk.FileInfo].WriteAt(dataWithoutPadding, packet.Chunk.Offset)
 		rx.finishedChunks[packet.Chunk] = struct{}{}
 		delete(rx.chunkDecoders, packet.Chunk) // remove the decoder immediately if the chunk is finished to avoid corruption
 	}
@@ -105,10 +107,10 @@ type Chunk struct {
 }
 
 func (c Chunk) sourceBlockCount() int64 {
-	return int64(float64(c.Size / c.PacketSize))
+	return int64(float64(c.paddedSize() / c.PacketSize))
 }
 func (c Chunk) decoder() fountain.Decoder {
-	return fountain.NewRaptorCodec(int(c.sourceBlockCount()), 8).NewDecoder(int(c.Size))
+	return fountain.NewRaptorCodec(int(c.sourceBlockCount()), 8).NewDecoder(int(c.paddedSize()))
 }
 func (c Chunk) codec() fountain.Codec {
 	return fountain.NewRaptorCodec(int(c.sourceBlockCount()), 8)
@@ -116,8 +118,13 @@ func (c Chunk) codec() fountain.Codec {
 func (c Chunk) targetBlockCount() int64 {
 	return c.sourceBlockCount() + 5 // Add a small buffer to allow for Raptor block overflow
 }
+func (c Chunk) paddedSize() int64 {
+	return c.PacketSize * int64(math.Ceil(float64(c.Size)/float64(c.PacketSize)))
+}
 func (c Chunk) encode(data []byte) []fountain.LTBlock {
-	return fountain.EncodeLTBlocks(data, c.buildIds(), c.codec())
+	necessaryPadding := c.paddedSize() - c.Size
+	paddedData := append(data, make([]byte, necessaryPadding)...)
+	return fountain.EncodeLTBlocks(paddedData, c.buildIds(), c.codec())
 }
 func (c Chunk) buildIds() []int64 {
 	ids := make([]int64, c.targetBlockCount())

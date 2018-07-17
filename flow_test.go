@@ -33,6 +33,26 @@ func TestSingleChunkTransmission(t *testing.T) {
 	virtualFile2.Validate(t)
 }
 
+func TestPaddingOnOddSizedFiles(t *testing.T) {
+	Size := 12345
+	virtualFile1 := newVirtualFile("f1",int64(Size))
+	PacketSize := 89 // 1KB
+	SymbolCount := Size / PacketSize // 1000 packets
+	EncodingBuffer := 100
+
+	tx := NewTransmitter()
+	sourceFileTxInfo1 := tx.AddFile("s1", virtualFile1, int64(Size))
+	tx.ActivateChunk(Chunk{FileInfo: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
+
+	rx := NewReceiver()
+	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
+
+	for i := 0; i <= 1*(SymbolCount+EncodingBuffer); i++ {
+		rx.Receive(tx.GeneratePacket())
+	}
+	virtualFile1.Validate(t)
+}
+
 type virtualTestFile struct {
 	source      []byte
 	destination []byte
