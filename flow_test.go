@@ -17,8 +17,8 @@ func TestSingleChunkTransmission(t *testing.T) {
 	EncodingBuffer := 100
 
 	tx := NewTransmitter()
-	sourceFileTxInfo1 := tx.AddFile("s1", virtualFile1, int64(Size))
-	sourceFileTxInfo2 := tx.AddFile("s2", virtualFile2, int64(Size))
+	sourceFileTxInfo1 := tx.AddObject("s1", virtualFile1, int64(Size))
+	sourceFileTxInfo2 := tx.AddObject("s2", virtualFile2, int64(Size))
 	tx.ActivateChunk(Chunk{ObjectInfo: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
 	tx.ActivateChunk(Chunk{ObjectInfo: sourceFileTxInfo2, Size: sourceFileTxInfo2.Size, Offset: 0, PacketSize: int64(PacketSize)})
 
@@ -41,7 +41,7 @@ func TestPaddingOnOddSizedFiles(t *testing.T) {
 	EncodingBuffer := 100
 
 	tx := NewTransmitter()
-	sourceFileTxInfo1 := tx.AddFile("s1", virtualFile1, int64(Size))
+	sourceFileTxInfo1 := tx.AddObject("s1", virtualFile1, int64(Size))
 	tx.ActivateChunk(Chunk{ObjectInfo: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
 
 	rx := NewReceiver()
@@ -59,8 +59,8 @@ func TestMultiChunkTransmission(t *testing.T) {
 	oddFile := newVirtualFile("odd", int64(12345))
 
 	tx := NewTransmitter()
-	evenTxInfo := tx.AddFile(evenFile.id, evenFile, evenFile.size())
-	oddTxInfo := tx.AddFile(oddFile.id, oddFile, oddFile.size())
+	evenTxInfo := tx.AddObject(evenFile.id, evenFile, evenFile.size())
+	oddTxInfo := tx.AddObject(oddFile.id, oddFile, oddFile.size())
 	tx.ActivateChunk(Chunk{ObjectInfo: evenTxInfo, Size: evenFile.size() / 2, Offset: 0, PacketSize: 100})
 	tx.ActivateChunk(Chunk{ObjectInfo: evenTxInfo, Size: evenFile.size() / 2, Offset: evenTxInfo.Size / 2, PacketSize: 100})
 

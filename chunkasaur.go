@@ -21,9 +21,9 @@ func NewTransmitter() *Transmitter {
 	}
 }
 
-func (tx *Transmitter) AddFile(id string, r io.ReaderAt, fileSize int64) (o Object) {
+func (tx *Transmitter) AddObject(id string, r io.ReaderAt, totalSize int64) (o Object) {
 	o.ID = id
-	o.Size = fileSize
+	o.Size = totalSize
 	tx.readers[o] = r
 	return
 }
