@@ -19,8 +19,8 @@ func TestSingleChunkTransmission(t *testing.T) {
 	tx := NewTransmitter()
 	sourceFileTxInfo1 := tx.AddObject("s1", virtualFile1, int64(Size))
 	sourceFileTxInfo2 := tx.AddObject("s2", virtualFile2, int64(Size))
-	tx.ActivateChunk(Chunk{ObjectInfo: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
-	tx.ActivateChunk(Chunk{ObjectInfo: sourceFileTxInfo2, Size: sourceFileTxInfo2.Size, Offset: 0, PacketSize: int64(PacketSize)})
+	tx.ActivateChunk(Chunk{Object: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
+	tx.ActivateChunk(Chunk{Object: sourceFileTxInfo2, Size: sourceFileTxInfo2.Size, Offset: 0, PacketSize: int64(PacketSize)})
 
 	rx := NewReceiver()
 	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
@@ -42,7 +42,7 @@ func TestPaddingOnOddSizedFiles(t *testing.T) {
 
 	tx := NewTransmitter()
 	sourceFileTxInfo1 := tx.AddObject("s1", virtualFile1, int64(Size))
-	tx.ActivateChunk(Chunk{ObjectInfo: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
+	tx.ActivateChunk(Chunk{Object: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
 
 	rx := NewReceiver()
 	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
@@ -61,11 +61,11 @@ func TestMultiChunkTransmission(t *testing.T) {
 	tx := NewTransmitter()
 	evenTxInfo := tx.AddObject(evenFile.id, evenFile, evenFile.size())
 	oddTxInfo := tx.AddObject(oddFile.id, oddFile, oddFile.size())
-	tx.ActivateChunk(Chunk{ObjectInfo: evenTxInfo, Size: evenFile.size() / 2, Offset: 0, PacketSize: 100})
-	tx.ActivateChunk(Chunk{ObjectInfo: evenTxInfo, Size: evenFile.size() / 2, Offset: evenTxInfo.Size / 2, PacketSize: 100})
+	tx.ActivateChunk(Chunk{Object: evenTxInfo, Size: evenFile.size() / 2, Offset: 0, PacketSize: 100})
+	tx.ActivateChunk(Chunk{Object: evenTxInfo, Size: evenFile.size() / 2, Offset: evenTxInfo.Size / 2, PacketSize: 100})
 
-	tx.ActivateChunk(Chunk{ObjectInfo: oddTxInfo, Size: 8392, Offset: 0, PacketSize: 100})
-	tx.ActivateChunk(Chunk{ObjectInfo: oddTxInfo, Size: 3953, Offset: 8392, PacketSize: 100})
+	tx.ActivateChunk(Chunk{Object: oddTxInfo, Size: 8392, Offset: 0, PacketSize: 100})
+	tx.ActivateChunk(Chunk{Object: oddTxInfo, Size: 3953, Offset: 8392, PacketSize: 100})
 
 	rx := NewReceiver()
 	rx.PrepareForReception(evenTxInfo, evenFile)
