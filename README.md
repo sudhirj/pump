@@ -1,5 +1,5 @@
-# chunkasaur
-Transmit large files over lossy networks using Raptor fountain codes
+# Pump
+Transmit large files over lossy networks using fountain codes
 
 ```
 tx := Tx{chunkSize: 8000000, packetSize: 1000}
