@@ -82,18 +82,18 @@ func (rx *Receiver) Receive(packet Packet) {
 	if _, registered := rx.writers[packet.Chunk.FileInfo]; !registered {
 		return
 	}
-	if _, done := rx.finishedChunks[packet.Chunk]; done {
+	if _, alreadyFinished := rx.finishedChunks[packet.Chunk]; alreadyFinished {
 		return
 	}
 	if _, present := rx.chunkDecoders[packet.Chunk]; !present {
 		rx.chunkDecoders[packet.Chunk] = packet.Chunk.decoder()
 	}
-
 	if rx.chunkDecoders[packet.Chunk].AddBlocks([]fountain.LTBlock{packet.Block}) {
+		// Returns true if decoding of this chunk is complete
 		dataWithoutPadding := rx.chunkDecoders[packet.Chunk].Decode()[:packet.Chunk.Size]
 		rx.writers[packet.Chunk.FileInfo].WriteAt(dataWithoutPadding, packet.Chunk.Offset)
 		rx.finishedChunks[packet.Chunk] = struct{}{}
-		delete(rx.chunkDecoders, packet.Chunk) // remove the decoder immediately if the chunk is finished to avoid corruption
+		delete(rx.chunkDecoders, packet.Chunk) // remove the decoder immediately to avoid corruption with more blocks
 	}
 }
 
