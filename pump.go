@@ -20,16 +20,16 @@ type Chunk struct {
 type ChunkDecoder struct {
 	Chunk    Chunk
 	decoder  fountain.Decoder
-	complete bool
+	Complete bool
 }
 
 func (cd *ChunkDecoder) Ingest(packet Packet) (finished bool) {
-	if cd.complete {
+	if cd.Complete {
 		return
 	}
 	finished = cd.decoder.AddBlocks([]fountain.LTBlock{packet.Block})
 	if finished {
-		cd.complete = true
+		cd.Complete = true
 	}
 	return
 }
