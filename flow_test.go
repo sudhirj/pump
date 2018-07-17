@@ -1,4 +1,4 @@
-package chunkasaur
+package pump
 
 import (
 	"bytes"
