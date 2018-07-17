@@ -20,21 +20,24 @@ type Chunk struct {
 type ChunkDecoder struct {
 	Chunk    Chunk
 	decoder  fountain.Decoder
-	Complete bool
+	complete bool
 }
 
 func (cd *ChunkDecoder) Ingest(packet Packet) (finished bool) {
-	if cd.Complete {
+	if cd.Complete() {
 		return
 	}
 	finished = cd.decoder.AddBlocks([]fountain.LTBlock{packet.Block})
 	if finished {
-		cd.Complete = true
+		cd.complete = true
 	}
 	return
 }
 func (cd *ChunkDecoder) Data() []byte {
 	return cd.decoder.Decode()[:cd.Chunk.Size]
+}
+func (cd *ChunkDecoder) Complete() bool {
+	return cd.complete
 }
 
 func (c Chunk) sourceBlockCount() int64 {
