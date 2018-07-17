@@ -3,7 +3,9 @@ package chunkasaur
 import (
 	"github.com/google/gofountain"
 	"io"
+	"log"
 	"math"
+	"sort"
 )
 
 type Transmitter struct {
@@ -52,6 +54,13 @@ func (tx *Transmitter) activeChunks() (activeChunks []Chunk) {
 	for c := range tx.chunkBlocks { // Not optimal, but good enough since N is usually small
 		activeChunks = append(activeChunks, c)
 	}
+	sort.Slice(activeChunks, func(i, j int) bool {
+		return ((activeChunks[i].ObjectInfo.ID == activeChunks[j].ObjectInfo.ID) &&
+			(activeChunks[i].Offset < activeChunks[j].Offset)) ||
+			(activeChunks[i].ObjectInfo.ID < activeChunks[j].ObjectInfo.ID)
+	})
+	log.Println(activeChunks)
+
 	return
 }
 func (tx *Transmitter) chooseBlockIndex(chunk Chunk) int64 {
