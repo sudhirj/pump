@@ -12,13 +12,13 @@ type Chunk struct {
 	PacketSize int64
 }
 
-type ChunkDecoder struct {
-	Chunk    Chunk
+type chunkDecoder struct {
+	chunk    Chunk
 	decoder  fountain.Decoder
 	complete bool
 }
 
-func (cd *ChunkDecoder) Ingest(packet Packet) (finished bool) {
+func (cd *chunkDecoder) Ingest(packet Packet) (finished bool) {
 	if cd.Complete() {
 		return
 	}
@@ -28,19 +28,19 @@ func (cd *ChunkDecoder) Ingest(packet Packet) (finished bool) {
 	}
 	return
 }
-func (cd *ChunkDecoder) Data() []byte {
-	return cd.decoder.Decode()[:cd.Chunk.Size]
+func (cd *chunkDecoder) Data() []byte {
+	return cd.decoder.Decode()[:cd.chunk.Size]
 }
-func (cd *ChunkDecoder) Complete() bool {
+func (cd *chunkDecoder) Complete() bool {
 	return cd.complete
 }
 
 func (c Chunk) sourceBlockCount() int64 {
 	return int64(float64(c.paddedSize() / c.PacketSize))
 }
-func (c Chunk) decoder() *ChunkDecoder {
-	return &ChunkDecoder{
-		Chunk:   c,
+func (c Chunk) decoder() *chunkDecoder {
+	return &chunkDecoder{
+		chunk:   c,
 		decoder: c.codec().NewDecoder(int(c.paddedSize())),
 	}
 }

@@ -6,14 +6,14 @@ import (
 
 type Receiver struct {
 	writers        map[Object]io.WriterAt
-	chunkDecoders  map[Chunk]*ChunkDecoder
+	chunkDecoders  map[Chunk]*chunkDecoder
 	finishedChunks map[Chunk]struct{}
 }
 
 func NewReceiver() *Receiver {
 	return &Receiver{
 		writers:        make(map[Object]io.WriterAt),
-		chunkDecoders:  make(map[Chunk]*ChunkDecoder),
+		chunkDecoders:  make(map[Chunk]*chunkDecoder),
 		finishedChunks: make(map[Chunk]struct{}),
 	}
 }
