@@ -52,7 +52,7 @@ func (c Chunk) decoder() *ChunkDecoder {
 func (c Chunk) codec() fountain.Codec {
 	return fountain.NewRaptorCodec(int(c.sourceBlockCount()), 8)
 }
-func (c Chunk) targetBlockCount() int64 {
+func (c Chunk) reasonableBlockCount() int64 {
 	return c.sourceBlockCount() + 5 // Add a small buffer to allow for Raptor block overflow
 }
 func (c Chunk) paddedSize() int64 {
@@ -67,7 +67,7 @@ func (c Chunk) encode(data []byte) (packets []Packet) {
 	return
 }
 func (c Chunk) buildIds() []int64 {
-	ids := make([]int64, c.targetBlockCount())
+	ids := make([]int64, c.reasonableBlockCount())
 	for i := range ids {
 		ids[i] = int64(i)
 	}
