@@ -12,6 +12,39 @@ type Chunk struct {
 	PacketSize int64
 }
 
+type chunkEncoder struct {
+	chunk             Chunk
+	encoder           fountain.Codec
+	sourceSymbols     []fountain.LTBlock
+	repairSymbolCache map[int64]fountain.LTBlock
+}
+
+func (ce *chunkEncoder) generatePacket(blockIndex int64) Packet {
+	if blockIndex <= ce.chunk.sourceBlockCount()-1 {
+		return Packet{Chunk: ce.chunk, Block: ce.sourceSymbols[blockIndex]}
+	}
+	return ce.generateRepairPacket(blockIndex)
+}
+func (ce *chunkEncoder) data() (data []byte) {
+	for _, block := range ce.sourceSymbols {
+		data = append(data, block.Data...)
+	}
+	return
+}
+func (ce *chunkEncoder) generateRepairPacket(blockIndex int64) Packet {
+	if _, availableInCache := ce.repairSymbolCache[blockIndex]; !availableInCache {
+		numberOfRepairSymbolsToCache := ce.chunk.sourceBlockCount() / 3
+		for _, ltBlock := range fountain.EncodeLTBlocks(ce.data(), buildRange(blockIndex, blockIndex+numberOfRepairSymbolsToCache), ce.encoder) {
+			ce.repairSymbolCache[ltBlock.BlockCode] = ltBlock
+		}
+		// clear old repair symbols out, doesn't make sense to reuse them
+		for _, blockCode := range buildRange(blockIndex-numberOfRepairSymbolsToCache, blockIndex-1) {
+			delete(ce.repairSymbolCache, blockCode)
+		}
+	}
+	return Packet{Chunk: ce.chunk, Block: ce.repairSymbolCache[blockIndex]}
+}
+
 type chunkDecoder struct {
 	chunk    Chunk
 	decoder  fountain.Decoder
@@ -44,24 +77,24 @@ func (c Chunk) decoder() *chunkDecoder {
 func (c Chunk) codec() fountain.Codec {
 	return fountain.NewRaptorCodec(int(c.sourceBlockCount()), 8)
 }
-func (c Chunk) reasonableBlockCount() int64 {
-	return c.sourceBlockCount() + 5 // Add a small buffer to allow for Raptor block overflow
-}
+
 func (c Chunk) paddedSize() int64 {
 	return c.PacketSize * int64(math.Ceil(float64(c.Size)/float64(c.PacketSize)))
 }
-func (c Chunk) encode(data []byte) (packets []Packet) {
+func (c Chunk) encode(data []byte) (encoder *chunkEncoder) {
 	necessaryPadding := c.paddedSize() - c.Size
 	paddedData := append(data, make([]byte, necessaryPadding)...)
-	for _, ltBlock := range fountain.EncodeLTBlocks(paddedData, c.buildIds(), c.codec()) {
-		packets = append(packets, Packet{Chunk: c, Block: ltBlock})
+	return &chunkEncoder{
+		encoder:           c.codec(),
+		chunk:             c,
+		sourceSymbols:     fountain.EncodeLTBlocks(paddedData, c.buildIds(), c.codec()),
+		repairSymbolCache: make(map[int64]fountain.LTBlock),
 	}
-	return
 }
 func (c Chunk) buildIds() []int64 {
-	ids := make([]int64, c.reasonableBlockCount())
-	for i := range ids {
-		ids[i] = int64(i)
-	}
-	return ids
+	return buildRange(0, c.sourceBlockCount())
+
+}
+func (c Chunk) valid() bool {
+	return c.sourceBlockCount() <= 8000
 }

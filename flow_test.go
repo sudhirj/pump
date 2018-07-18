@@ -2,13 +2,14 @@ package pump
 
 import (
 	"bytes"
+	"github.com/davecgh/go-spew/spew"
 	"io"
 	"math/rand"
 	"testing"
 	"time"
 )
 
-func TestSingleChunkTransmission(t *testing.T) {
+func TestSingleChunkMultiFileTransmission(t *testing.T) {
 	Size := 1000000 // 1MB
 	virtualFile1 := newVirtualFile("f1", int64(Size))
 	virtualFile2 := newVirtualFile("f2", int64(Size))
@@ -76,6 +77,32 @@ func TestMultiChunkTransmission(t *testing.T) {
 	}
 	evenFile.Validate(t)
 	oddFile.Validate(t)
+}
+
+func TestEncodingDemo(t *testing.T) {
+	Size := 256
+	virtualFile1 := newVirtualFile("f1", int64(Size))
+	spew.Dump(virtualFile1.source)
+
+	PacketSize := 16
+	SymbolCount := Size / PacketSize
+	EncodingBuffer := 2
+
+	tx := NewTransmitter()
+	sourceFileTxInfo1 := tx.AddObject("s1", virtualFile1, int64(Size))
+
+	tx.ActivateChunk(Chunk{Object: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
+
+	rx := NewReceiver()
+	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
+
+	for i := 0; i <= 2*(SymbolCount+EncodingBuffer); i++ {
+		packet := tx.GeneratePacket()
+		spew.Dump(packet.Block.BlockCode, packet.Block.Data)
+		rx.Receive(packet)
+	}
+	virtualFile1.Validate(t)
+
 }
 
 type virtualTestFile struct {

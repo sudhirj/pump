@@ -2,12 +2,11 @@ package pump
 
 import (
 	"io"
-	"sort"
 )
 
 type Transmitter struct {
 	readers            map[Object]io.ReaderAt
-	chunkPackets       map[Chunk][]Packet
+	chunkEncoders      map[Chunk]*chunkEncoder
 	chunkIndex         int64
 	chunkPacketIndexes map[Chunk]int64
 }
@@ -15,7 +14,7 @@ type Transmitter struct {
 func NewTransmitter() *Transmitter {
 	return &Transmitter{
 		readers:            make(map[Object]io.ReaderAt),
-		chunkPackets:       make(map[Chunk][]Packet),
+		chunkEncoders:      make(map[Chunk]*chunkEncoder),
 		chunkPacketIndexes: make(map[Chunk]int64),
 	}
 }
@@ -26,37 +25,35 @@ func (tx *Transmitter) AddObject(id string, r io.ReaderAt, totalSize int64) (o O
 	tx.readers[o] = r
 	return
 }
-func (tx *Transmitter) ActivateChunkWithWeight(chunk Chunk, weight int) {
-	data := make([]byte, chunk.Size)
-	tx.readers[chunk.Object].ReadAt(data, chunk.Offset)
-	tx.chunkPackets[chunk] = chunk.encode(data)
-}
+
 func (tx *Transmitter) GeneratePacket() (packet Packet) {
 	chosenChunk := tx.chooseChunk()
 	chosenPacketIndex := tx.choosePacketIndex(chosenChunk)
-	return tx.chunkPackets[chosenChunk][chosenPacketIndex]
+	return tx.chunkEncoders[chosenChunk].generatePacket(chosenPacketIndex)
 }
-func (tx *Transmitter) ActivateChunk(chunk Chunk)   { tx.ActivateChunkWithWeight(chunk, 1) }
+func (tx *Transmitter) ActivateChunk(chunk Chunk) {
+	if !chunk.valid() {
+		panic("That chunk cannot be used")
+	}
+	data := make([]byte, chunk.Size)
+	tx.readers[chunk.Object].ReadAt(data, chunk.Offset)
+	tx.chunkEncoders[chunk] = chunk.encode(data)
+}
 func (tx *Transmitter) DeactivateChunk(chunk Chunk) {}
 
 func (tx *Transmitter) chooseChunk() Chunk {
-	idx := tx.chunkIndex % int64(len(tx.chunkPackets))
+	idx := tx.chunkIndex % int64(len(tx.chunkEncoders))
 	tx.chunkIndex++
 	return tx.activeChunks()[idx]
 }
 func (tx *Transmitter) activeChunks() (activeChunks []Chunk) {
-	for c := range tx.chunkPackets { // Not optimal, but good enough since N is usually small
+	for c := range tx.chunkEncoders { // Not optimal, but good enough since N is usually small
 		activeChunks = append(activeChunks, c)
 	}
-	sort.Slice(activeChunks, func(i, j int) bool {
-		return ((activeChunks[i].Object.ID == activeChunks[j].Object.ID) &&
-			(activeChunks[i].Offset < activeChunks[j].Offset)) ||
-			(activeChunks[i].Object.ID < activeChunks[j].Object.ID)
-	})
 	return
 }
 func (tx *Transmitter) choosePacketIndex(chunk Chunk) int64 {
-	idx := tx.chunkPacketIndexes[chunk] % int64(len(tx.chunkPackets[chunk]))
+	idx := tx.chunkPacketIndexes[chunk]
 	tx.chunkPacketIndexes[chunk]++
 	return idx
 
