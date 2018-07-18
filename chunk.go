@@ -18,9 +18,9 @@ type chunkDecoder struct {
 	complete bool
 }
 
-func (cd *chunkDecoder) Ingest(packet Packet) (finished bool) {
-	if cd.Complete() {
-		return
+func (cd *chunkDecoder) ingest(packet Packet) (finished bool) {
+	if cd.complete {
+		return // adding blocks to completed decoder will corrupt it
 	}
 	finished = cd.decoder.AddBlocks([]fountain.LTBlock{packet.Block})
 	if finished {
@@ -28,11 +28,8 @@ func (cd *chunkDecoder) Ingest(packet Packet) (finished bool) {
 	}
 	return
 }
-func (cd *chunkDecoder) Data() []byte {
+func (cd *chunkDecoder) data() []byte {
 	return cd.decoder.Decode()[:cd.chunk.Size]
-}
-func (cd *chunkDecoder) Complete() bool {
-	return cd.complete
 }
 
 func (c Chunk) sourceBlockCount() int64 {

@@ -31,8 +31,8 @@ func (rx *Receiver) Receive(packet Packet) {
 	if _, present := rx.chunkDecoders[packet.Chunk]; !present {
 		rx.chunkDecoders[packet.Chunk] = packet.Chunk.decoder()
 	}
-	if rx.chunkDecoders[packet.Chunk].Ingest(packet) {
-		rx.writers[packet.Chunk.Object].WriteAt(rx.chunkDecoders[packet.Chunk].Data(), packet.Chunk.Offset)
+	if rx.chunkDecoders[packet.Chunk].ingest(packet) {
+		rx.writers[packet.Chunk.Object].WriteAt(rx.chunkDecoders[packet.Chunk].data(), packet.Chunk.Offset)
 		rx.finishedChunks[packet.Chunk] = struct{}{}
 		delete(rx.chunkDecoders, packet.Chunk)
 	}
