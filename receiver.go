@@ -45,7 +45,7 @@ func (rx *Receiver) Idle() bool {
 }
 func (rx *Receiver) completedObjects() (completedObjects []Object) {
 	for o := range rx.writers {
-		if o.IsCompletedBy(rx.finishedChunkList()) {
+		if o.isCompletedBy(rx.finishedChunkList()) {
 			completedObjects = append(completedObjects, o)
 		}
 	}

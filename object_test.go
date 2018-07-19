@@ -92,8 +92,8 @@ func TestObject_IsCompletedBy(t *testing.T) {
 				ID:   tt.fields.ID,
 				Size: tt.fields.Size,
 			}
-			if gotFinished := o.IsCompletedBy(tt.args.finishedChunks); gotFinished != tt.wantFinished {
-				t.Errorf("Object.IsCompletedBy() = %v, want %v", gotFinished, tt.wantFinished)
+			if gotFinished := o.isCompletedBy(tt.args.finishedChunks); gotFinished != tt.wantFinished {
+				t.Errorf("Object.isCompletedBy() = %v, want %v", gotFinished, tt.wantFinished)
 			}
 		})
 	}

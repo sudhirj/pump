@@ -7,7 +7,7 @@ type Object struct {
 	Size int64
 }
 
-func (o Object) IsCompletedBy(finishedChunks []Chunk) bool {
+func (o Object) isCompletedBy(finishedChunks []Chunk) bool {
 	sort.Slice(finishedChunks, func(i, j int) bool {
 		return finishedChunks[i].Offset < finishedChunks[j].Offset
 	})
