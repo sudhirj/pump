@@ -77,7 +77,7 @@ func TestMultiChunkTransmission(t *testing.T) {
 }
 
 func TestEncodingDemo(t *testing.T) {
-	Size := 256
+	Size := 64
 	PacketSize := 16
 
 	virtualFile1 := newVirtualFile("f1", int64(Size))
@@ -93,7 +93,7 @@ func TestEncodingDemo(t *testing.T) {
 
 	for !rx.Idle() {
 		packet := tx.GeneratePacket()
-		spew.Dump(packet.Block.BlockCode, packet.Block.Data)
+		spew.Dump(packet.Block.Data)
 		rx.Receive(packet)
 	}
 	virtualFile1.Validate(t)
