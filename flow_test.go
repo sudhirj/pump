@@ -103,7 +103,7 @@ func TestEncodingDemo(t *testing.T) {
 }
 
 func TestLossyTransit(t *testing.T) {
-	Size := 8192
+	Size := 4096
 	PacketSize := 16
 
 	for lossRate := 0.0; lossRate <= 0.95; lossRate = lossRate + 0.01 {
