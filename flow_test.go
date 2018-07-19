@@ -10,12 +10,10 @@ import (
 )
 
 func TestSingleChunkMultiFileTransmission(t *testing.T) {
-	Size := 1000000 // 1MB
+	Size := 1000000    // 1MB
+	PacketSize := 1000 // 1KB
 	virtualFile1 := newVirtualFile("f1", int64(Size))
 	virtualFile2 := newVirtualFile("f2", int64(Size))
-	PacketSize := 1000               // 1KB
-	SymbolCount := Size / PacketSize // 1000 packets
-	EncodingBuffer := 100
 
 	tx := NewTransmitter()
 	sourceFileTxInfo1 := tx.AddObject("s1", virtualFile1, int64(Size))
@@ -26,10 +24,12 @@ func TestSingleChunkMultiFileTransmission(t *testing.T) {
 	rx := NewReceiver()
 	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
 	rx.PrepareForReception(sourceFileTxInfo2, virtualFile2)
-
-	for i := 0; i <= 2*(SymbolCount+EncodingBuffer); i++ {
+	var packetCount int
+	for !rx.Idle() {
 		rx.Receive(tx.GeneratePacket())
+		packetCount++
 	}
+	t.Log(packetCount)
 	virtualFile1.Validate(t)
 	virtualFile2.Validate(t)
 }
@@ -37,9 +37,7 @@ func TestSingleChunkMultiFileTransmission(t *testing.T) {
 func TestPaddingOnOddSizedFiles(t *testing.T) {
 	Size := 12345
 	virtualFile1 := newVirtualFile("f1", int64(Size))
-	PacketSize := 89                 // 1KB
-	SymbolCount := Size / PacketSize // 1000 packets
-	EncodingBuffer := 100
+	PacketSize := 89 // 1KB
 
 	tx := NewTransmitter()
 	sourceFileTxInfo1 := tx.AddObject("s1", virtualFile1, int64(Size))
@@ -48,7 +46,7 @@ func TestPaddingOnOddSizedFiles(t *testing.T) {
 	rx := NewReceiver()
 	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
 
-	for i := 0; i <= 1*(SymbolCount+EncodingBuffer); i++ {
+	for !rx.Idle() {
 		rx.Receive(tx.GeneratePacket())
 	}
 	virtualFile1.Validate(t)
@@ -72,7 +70,7 @@ func TestMultiChunkTransmission(t *testing.T) {
 	rx.PrepareForReception(evenTxInfo, evenFile)
 	rx.PrepareForReception(oddTxInfo, oddFile)
 
-	for i := 0; i <= int((evenFile.size()+oddFile.size())/100+1000); i++ {
+	for !rx.Idle() {
 		rx.Receive(tx.GeneratePacket())
 	}
 	evenFile.Validate(t)
@@ -81,12 +79,10 @@ func TestMultiChunkTransmission(t *testing.T) {
 
 func TestEncodingDemo(t *testing.T) {
 	Size := 256
+	PacketSize := 16
+
 	virtualFile1 := newVirtualFile("f1", int64(Size))
 	spew.Dump(virtualFile1.source)
-
-	PacketSize := 16
-	SymbolCount := Size / PacketSize
-	EncodingBuffer := 2
 
 	tx := NewTransmitter()
 	sourceFileTxInfo1 := tx.AddObject("s1", virtualFile1, int64(Size))
@@ -96,7 +92,7 @@ func TestEncodingDemo(t *testing.T) {
 	rx := NewReceiver()
 	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
 
-	for i := 0; i <= 2*(SymbolCount+EncodingBuffer); i++ {
+	for !rx.Idle() {
 		packet := tx.GeneratePacket()
 		spew.Dump(packet.Block.BlockCode, packet.Block.Data)
 		rx.Receive(packet)

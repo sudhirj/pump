@@ -37,3 +37,23 @@ func (rx *Receiver) Receive(packet Packet) {
 		delete(rx.chunkDecoders, packet.Chunk)
 	}
 }
+func (rx *Receiver) Idle() bool {
+	if len(rx.completedObjects()) == len(rx.writers) {
+		return true
+	}
+	return false
+}
+func (rx *Receiver) completedObjects() (completedObjects []Object) {
+	for o := range rx.writers {
+		if o.IsCompletedBy(rx.finishedChunkList()) {
+			completedObjects = append(completedObjects, o)
+		}
+	}
+	return
+}
+func (rx *Receiver) finishedChunkList() (finishedChunkList []Chunk) {
+	for c := range rx.finishedChunks {
+		finishedChunkList = append(finishedChunkList, c)
+	}
+	return
+}

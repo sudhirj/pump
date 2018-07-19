@@ -1,8 +1,11 @@
 package pump
 
 import (
+	"errors"
 	"io"
 )
+
+var ChunkRatioInvalid = errors.New("the ratio of chunk to packet size is too high - either use larger packets or a smaller chunk")
 
 type Transmitter struct {
 	readers            map[Object]io.ReaderAt
@@ -31,14 +34,17 @@ func (tx *Transmitter) GeneratePacket() (packet Packet) {
 	chosenPacketIndex := tx.choosePacketIndex(chosenChunk)
 	return tx.chunkEncoders[chosenChunk].generatePacket(chosenPacketIndex)
 }
-func (tx *Transmitter) ActivateChunk(chunk Chunk) {
+
+func (tx *Transmitter) ActivateChunk(chunk Chunk) error {
 	if !chunk.valid() {
-		panic("That chunk cannot be used")
+		return ChunkRatioInvalid
 	}
 	data := make([]byte, chunk.Size)
 	tx.readers[chunk.Object].ReadAt(data, chunk.Offset)
 	tx.chunkEncoders[chunk] = chunk.encode(data)
+	return nil
 }
+
 func (tx *Transmitter) DeactivateChunk(chunk Chunk) {}
 
 func (tx *Transmitter) chooseChunk() Chunk {
@@ -46,12 +52,14 @@ func (tx *Transmitter) chooseChunk() Chunk {
 	tx.chunkIndex++
 	return tx.activeChunks()[idx]
 }
+
 func (tx *Transmitter) activeChunks() (activeChunks []Chunk) {
 	for c := range tx.chunkEncoders { // Not optimal, but good enough since N is usually small
 		activeChunks = append(activeChunks, c)
 	}
 	return
 }
+
 func (tx *Transmitter) choosePacketIndex(chunk Chunk) int64 {
 	idx := tx.chunkPacketIndexes[chunk]
 	tx.chunkPacketIndexes[chunk]++
