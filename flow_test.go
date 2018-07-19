@@ -2,14 +2,31 @@ package pump
 
 import (
 	"bytes"
-	"github.com/davecgh/go-spew/spew"
 	"io"
-	"log"
 	"math/rand"
-	"strconv"
 	"testing"
 	"time"
 )
+
+func TestSimpleTransmission(t *testing.T) {
+	Size := 64000 * 1000
+	PacketSize := 64000
+
+	virtualFile1 := newVirtualFile("f1", int64(Size))
+
+	tx := NewTransmitter()
+	sourceFileTxInfo1 := tx.AddObject("s1", virtualFile1, int64(Size))
+
+	tx.ActivateChunk(Chunk{Object: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
+
+	rx := NewReceiver()
+	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
+
+	for !rx.Idle() {
+		rx.Receive(tx.GeneratePacket())
+	}
+	virtualFile1.Validate(t)
+}
 
 func TestSingleChunkMultiFileTransmission(t *testing.T) {
 	Size := 1000000    // 1MB
@@ -76,57 +93,6 @@ func TestMultiFileMultiChunkTransmission(t *testing.T) {
 	}
 	evenFile.Validate(t)
 	oddFile.Validate(t)
-}
-
-func TestEncodingDemo(t *testing.T) {
-	Size := 64
-	PacketSize := 16
-
-	virtualFile1 := newVirtualFile("f1", int64(Size))
-	spew.Dump(virtualFile1.source)
-
-	tx := NewTransmitter()
-	sourceFileTxInfo1 := tx.AddObject("s1", virtualFile1, int64(Size))
-
-	tx.ActivateChunk(Chunk{Object: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
-
-	rx := NewReceiver()
-	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
-
-	for !rx.Idle() {
-		packet := tx.GeneratePacket()
-		spew.Dump(packet.Block.Data)
-		rx.Receive(packet)
-	}
-	virtualFile1.Validate(t)
-
-}
-
-func TestLossyTransit(t *testing.T) {
-	Size := 4096
-	PacketSize := 16
-
-	for lossRate := 0.0; lossRate <= 0.95; lossRate = lossRate + 0.01 {
-		virtualFile1 := newVirtualFile(strconv.FormatFloat(lossRate, 'f', 2, 64), int64(Size))
-
-		tx := NewTransmitter()
-		sourceFileTxInfo1 := tx.AddObject("s1", virtualFile1, int64(Size))
-
-		tx.ActivateChunk(Chunk{Object: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
-		rx := NewReceiver()
-		rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
-		packetCount := 0
-		for !rx.Idle() {
-			packet := tx.GeneratePacket()
-			packetCount++
-			if rand.Float64() > lossRate {
-				rx.Receive(packet)
-			}
-		}
-		virtualFile1.Validate(t)
-		log.Printf("LR %.2f / TR %.2f", lossRate, float32(packetCount)/float32(Size/PacketSize)-1)
-	}
-
 }
 
 type virtualTestFile struct {

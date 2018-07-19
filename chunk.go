@@ -21,15 +21,19 @@ type chunkEncoder struct {
 
 func (ce *chunkEncoder) generatePacket(blockIndex int64) Packet {
 	if _, available := ce.symbolCache[blockIndex]; !available {
-		tempData := make([]byte, len(ce.data))
-		copy(tempData, ce.data)
-		blocks := fountain.EncodeLTBlocks(tempData, buildRange(blockIndex, blockIndex+ce.chunk.sourceBlockCount()), ce.encoder)
+		idsToBuild := buildRange(blockIndex, blockIndex+ce.chunk.sourceBlockCount())
+		blocks := fountain.EncodeLTBlocks(ce.copyOfData(), idsToBuild, ce.encoder)
 		ce.symbolCache = make(map[int64]fountain.LTBlock)
 		for _, block := range blocks {
 			ce.symbolCache[block.BlockCode] = block
 		}
 	}
 	return Packet{Chunk: ce.chunk, Block: ce.symbolCache[blockIndex]}
+}
+func (ce *chunkEncoder) copyOfData() []byte {
+	dataCopy := make([]byte, len(ce.data))
+	copy(dataCopy, ce.data)
+	return dataCopy
 }
 
 type chunkDecoder struct {
@@ -53,12 +57,12 @@ func (cd *chunkDecoder) data() []byte {
 }
 
 func (c Chunk) sourceBlockCount() int64 {
-	return int64(math.Ceil(float64(c.paddedSourceBlockSize()) / float64(c.PacketSize)))
+	return int64(math.Ceil(float64(c.alignedSourceBlockSize()) / float64(c.PacketSize)))
 }
 func (c Chunk) decoder() *chunkDecoder {
 	return &chunkDecoder{
 		chunk:   c,
-		decoder: c.codec().NewDecoder(int(c.paddedSourceBlockSize())),
+		decoder: c.codec().NewDecoder(int(c.alignedSourceBlockSize())),
 	}
 }
 func (c Chunk) codec() fountain.Codec {
@@ -68,20 +72,22 @@ func (c Chunk) valid() bool {
 	return c.sourceBlockCount() <= 8100
 }
 func (c Chunk) encoder(data []byte) (encoder *chunkEncoder) {
-	necessaryPadding := c.paddedSourceBlockSize() - c.Size
-	paddedData := append(data, make([]byte, necessaryPadding)...)
 	return &chunkEncoder{
 		encoder:     c.codec(),
 		chunk:       c,
-		data:        paddedData,
+		data:        append(data, c.padding()...),
 		symbolCache: make(map[int64]fountain.LTBlock),
 	}
 }
-func (c Chunk) paddedSourceBlockSize() int64 {
+func (c Chunk) alignedSourceBlockSize() int64 {
 	return c.PacketSize * int64(math.Ceil(float64(c.Size)/float64(c.PacketSize)))
 }
 
 func (c Chunk) buildIds() []int64 {
 	return buildRange(0, c.sourceBlockCount()*3)
 
+}
+
+func (c Chunk) padding() []byte {
+	return make([]byte, c.alignedSourceBlockSize()-c.Size)
 }
