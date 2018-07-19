@@ -13,36 +13,22 @@ type Chunk struct {
 }
 
 type chunkEncoder struct {
-	chunk             Chunk
-	encoder           fountain.Codec
-	sourceSymbols     []fountain.LTBlock
-	repairSymbolCache map[int64]fountain.LTBlock
+	chunk       Chunk
+	encoder     fountain.Codec
+	data        []byte
+	symbolCache map[int64]fountain.LTBlock
 }
 
 func (ce *chunkEncoder) generatePacket(blockIndex int64) Packet {
-	if blockIndex <= ce.chunk.sourceBlockCount()-1 {
-		return Packet{Chunk: ce.chunk, Block: ce.sourceSymbols[blockIndex]}
-	}
-	return ce.generateRepairPacket(blockIndex)
-}
-func (ce *chunkEncoder) data() (data []byte) {
-	for _, block := range ce.sourceSymbols {
-		data = append(data, block.Data...)
-	}
-	return
-}
-func (ce *chunkEncoder) generateRepairPacket(blockIndex int64) Packet {
-	if _, availableInCache := ce.repairSymbolCache[blockIndex]; !availableInCache {
-		numberOfRepairSymbolsToCache := ce.chunk.sourceBlockCount() / 3
-		for _, ltBlock := range fountain.EncodeLTBlocks(ce.data(), buildRange(blockIndex, blockIndex+numberOfRepairSymbolsToCache), ce.encoder) {
-			ce.repairSymbolCache[ltBlock.BlockCode] = ltBlock
-		}
-		// clear old repair symbols out, doesn't make sense to reuse them
-		for _, blockCode := range buildRange(blockIndex-numberOfRepairSymbolsToCache, blockIndex-1) {
-			delete(ce.repairSymbolCache, blockCode)
+	if _, available := ce.symbolCache[blockIndex]; !available {
+		tempData := make([]byte, len(ce.data))
+		copy(tempData, ce.data)
+		blocks := fountain.EncodeLTBlocks(tempData, buildRange(blockIndex, blockIndex+ce.chunk.sourceBlockCount()), ce.encoder)
+		for _, block := range blocks {
+			ce.symbolCache[block.BlockCode] = block
 		}
 	}
-	return Packet{Chunk: ce.chunk, Block: ce.repairSymbolCache[blockIndex]}
+	return Packet{Chunk: ce.chunk, Block: ce.symbolCache[blockIndex]}
 }
 
 type chunkDecoder struct {
@@ -84,10 +70,10 @@ func (c Chunk) encoder(data []byte) (encoder *chunkEncoder) {
 	necessaryPadding := c.paddedSourceBlockSize() - c.Size
 	paddedData := append(data, make([]byte, necessaryPadding)...)
 	return &chunkEncoder{
-		encoder:           c.codec(),
-		chunk:             c,
-		sourceSymbols:     fountain.EncodeLTBlocks(paddedData, c.buildIds(), c.codec()),
-		repairSymbolCache: make(map[int64]fountain.LTBlock),
+		encoder:     c.codec(),
+		chunk:       c,
+		data:        paddedData,
+		symbolCache: make(map[int64]fountain.LTBlock),
 	}
 }
 func (c Chunk) paddedSourceBlockSize() int64 {
@@ -95,6 +81,6 @@ func (c Chunk) paddedSourceBlockSize() int64 {
 }
 
 func (c Chunk) buildIds() []int64 {
-	return buildRange(0, c.sourceBlockCount())
+	return buildRange(0, c.sourceBlockCount()*3)
 
 }
