@@ -24,12 +24,11 @@ func TestSingleChunkMultiFileTransmission(t *testing.T) {
 	rx := NewReceiver()
 	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
 	rx.PrepareForReception(sourceFileTxInfo2, virtualFile2)
-	var packetCount int
+
 	for !rx.Idle() {
 		rx.Receive(tx.GeneratePacket())
-		packetCount++
 	}
-	t.Log(packetCount)
+
 	virtualFile1.Validate(t)
 	virtualFile2.Validate(t)
 }
