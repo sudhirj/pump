@@ -53,7 +53,7 @@ func TestPaddingOnOddSizedFiles(t *testing.T) {
 	virtualFile1.Validate(t)
 }
 
-func TestMultiChunkTransmission(t *testing.T) {
+func TestMultiFileMultiChunkTransmission(t *testing.T) {
 
 	evenFile := newVirtualFile("even", int64(10000))
 	oddFile := newVirtualFile("odd", int64(12345))
