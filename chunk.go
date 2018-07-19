@@ -24,6 +24,7 @@ func (ce *chunkEncoder) generatePacket(blockIndex int64) Packet {
 		tempData := make([]byte, len(ce.data))
 		copy(tempData, ce.data)
 		blocks := fountain.EncodeLTBlocks(tempData, buildRange(blockIndex, blockIndex+ce.chunk.sourceBlockCount()), ce.encoder)
+		ce.symbolCache = make(map[int64]fountain.LTBlock)
 		for _, block := range blocks {
 			ce.symbolCache[block.BlockCode] = block
 		}
