@@ -53,7 +53,7 @@ type chunkDecoder struct {
 
 func (cd *chunkDecoder) ingest(packet Packet) (finished bool) {
 	if cd.complete {
-		return // adding blocks to completed decoder will corrupt it
+		return // because adding blocks to completed decoder will corrupt it
 	}
 	finished = cd.decoder.AddBlocks([]fountain.LTBlock{packet.Block})
 	if finished {
@@ -66,23 +66,22 @@ func (cd *chunkDecoder) data() []byte {
 }
 
 func (c Chunk) sourceBlockCount() int64 {
-	return int64(float64(c.paddedSize() / c.PacketSize))
+	return int64(math.Ceil(float64(c.paddedSourceBlockSize()) / float64(c.PacketSize)))
 }
 func (c Chunk) decoder() *chunkDecoder {
 	return &chunkDecoder{
 		chunk:   c,
-		decoder: c.codec().NewDecoder(int(c.paddedSize())),
+		decoder: c.codec().NewDecoder(int(c.paddedSourceBlockSize())),
 	}
 }
 func (c Chunk) codec() fountain.Codec {
 	return fountain.NewRaptorCodec(int(c.sourceBlockCount()), 8)
 }
-
-func (c Chunk) paddedSize() int64 {
-	return c.PacketSize * int64(math.Ceil(float64(c.Size)/float64(c.PacketSize)))
+func (c Chunk) valid() bool {
+	return c.sourceBlockCount() <= 8100
 }
-func (c Chunk) encode(data []byte) (encoder *chunkEncoder) {
-	necessaryPadding := c.paddedSize() - c.Size
+func (c Chunk) encoder(data []byte) (encoder *chunkEncoder) {
+	necessaryPadding := c.paddedSourceBlockSize() - c.Size
 	paddedData := append(data, make([]byte, necessaryPadding)...)
 	return &chunkEncoder{
 		encoder:           c.codec(),
@@ -91,10 +90,11 @@ func (c Chunk) encode(data []byte) (encoder *chunkEncoder) {
 		repairSymbolCache: make(map[int64]fountain.LTBlock),
 	}
 }
+func (c Chunk) paddedSourceBlockSize() int64 {
+	return c.PacketSize * int64(math.Ceil(float64(c.Size)/float64(c.PacketSize)))
+}
+
 func (c Chunk) buildIds() []int64 {
 	return buildRange(0, c.sourceBlockCount())
 
-}
-func (c Chunk) valid() bool {
-	return c.sourceBlockCount() <= 8000
 }

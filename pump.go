@@ -18,7 +18,6 @@ func buildRange(start int64, end int64) []int64 {
 	}
 	return ids
 }
-
 func timeTrack(start time.Time, name string) {
 	elapsed := time.Since(start)
 	log.Printf("%s took %s", name, elapsed)

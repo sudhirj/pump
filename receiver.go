@@ -43,6 +43,7 @@ func (rx *Receiver) Idle() bool {
 	}
 	return false
 }
+
 func (rx *Receiver) completedObjects() (completedObjects []Object) {
 	for o := range rx.writers {
 		if o.isCompletedBy(rx.finishedChunkList()) {
