@@ -5,6 +5,8 @@ import (
 	"math"
 )
 
+type FountainBlock = fountain.LTBlock
+
 type Chunk struct {
 	Object     Object
 	Size       int64
@@ -16,14 +18,14 @@ type chunkEncoder struct {
 	chunk       Chunk
 	encoder     fountain.Codec
 	data        []byte
-	symbolCache map[int64]fountain.LTBlock
+	symbolCache map[int64]FountainBlock
 }
 
 func (ce *chunkEncoder) generatePacket(blockIndex int64) Packet {
 	if _, available := ce.symbolCache[blockIndex]; !available {
 		idsToBuild := buildRange(blockIndex, blockIndex+ce.chunk.sourceBlockCount())
 		blocks := fountain.EncodeLTBlocks(ce.copyOfData(), idsToBuild, ce.encoder)
-		ce.symbolCache = make(map[int64]fountain.LTBlock)
+		ce.symbolCache = make(map[int64]FountainBlock)
 		for _, block := range blocks {
 			ce.symbolCache[block.BlockCode] = block
 		}
@@ -46,7 +48,7 @@ func (cd *chunkDecoder) ingest(packet Packet) (finished bool) {
 	if cd.complete {
 		return // because adding blocks to completed decoder will corrupt it
 	}
-	finished = cd.decoder.AddBlocks([]fountain.LTBlock{packet.Block})
+	finished = cd.decoder.AddBlocks([]FountainBlock{packet.Block})
 	if finished {
 		cd.complete = true
 	}
@@ -76,7 +78,7 @@ func (c Chunk) encoder(data []byte) (encoder *chunkEncoder) {
 		encoder:     c.codec(),
 		chunk:       c,
 		data:        append(data, c.padding()...),
-		symbolCache: make(map[int64]fountain.LTBlock),
+		symbolCache: make(map[int64]FountainBlock),
 	}
 }
 func (c Chunk) alignedSourceBlockSize() int64 {

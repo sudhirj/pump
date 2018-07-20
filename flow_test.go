@@ -9,7 +9,7 @@ import (
 )
 
 func TestSimpleTransmission(t *testing.T) {
-	Size := 64000 * 1000
+	Size := 64000 * 100
 	PacketSize := 64000
 
 	virtualFile1 := newVirtualFile("f1", int64(Size))
@@ -93,6 +93,29 @@ func TestMultiFileMultiChunkTransmission(t *testing.T) {
 	}
 	evenFile.Validate(t)
 	oddFile.Validate(t)
+}
+
+func TestMultiplexingSafety(t *testing.T) {
+	Size := 10000
+	PacketSize := 100
+	virtualFile1 := newVirtualFile("f1", int64(Size))
+	virtualFile2 := newVirtualFile("f2", int64(Size))
+
+	tx := NewTransmitter()
+	sourceFileTxInfo1 := tx.AddObject("s1", virtualFile1, int64(Size))
+	sourceFileTxInfo2 := tx.AddObject("s2", virtualFile2, int64(Size))
+	tx.ActivateChunk(Chunk{Object: sourceFileTxInfo1, Size: sourceFileTxInfo1.Size, Offset: 0, PacketSize: int64(PacketSize)})
+	tx.ActivateChunk(Chunk{Object: sourceFileTxInfo2, Size: sourceFileTxInfo2.Size, Offset: 0, PacketSize: int64(PacketSize)})
+
+	rx := NewReceiver()
+	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
+	// Don't prepare VF2 reception, but it's doing to be sent anyway
+
+	for !rx.Idle() {
+		rx.Receive(tx.GeneratePacket())
+	}
+
+	virtualFile1.Validate(t)
 }
 
 type virtualTestFile struct {

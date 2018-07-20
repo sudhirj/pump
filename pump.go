@@ -1,14 +1,13 @@
 package pump
 
 import (
-	"github.com/google/gofountain"
 	"log"
 	"time"
 )
 
 type Packet struct {
 	Chunk Chunk
-	Block fountain.LTBlock
+	Block FountainBlock
 }
 
 func buildRange(start int64, end int64) []int64 {
