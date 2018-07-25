@@ -2,6 +2,7 @@ package pump
 
 import (
 	"bytes"
+	"github.com/davecgh/go-spew/spew"
 	"io"
 	"math/rand"
 	"testing"
@@ -9,10 +10,11 @@ import (
 )
 
 func TestSimpleTransmission(t *testing.T) {
-	Size := 64000 * 100
-	PacketSize := 64000
+	Size := 16 * 5
+	PacketSize := 16
 
 	virtualFile1 := newVirtualFile("f1", int64(Size))
+	spew.Dump(virtualFile1.source)
 
 	tx := NewTransmitter()
 	sourceFileTxInfo1 := tx.AddObject("s1", virtualFile1, int64(Size))
@@ -21,9 +23,12 @@ func TestSimpleTransmission(t *testing.T) {
 
 	rx := NewReceiver()
 	rx.PrepareForReception(sourceFileTxInfo1, virtualFile1)
-
-	for !rx.Idle() {
-		rx.Receive(tx.GeneratePacket())
+	extraPacketsToDisplay := 0
+	for !rx.Idle() || extraPacketsToDisplay < 10 {
+		packet := tx.GeneratePacket()
+		spew.Dump(packet.Block.BlockCode, packet.Block.Data)
+		rx.Receive(packet)
+		extraPacketsToDisplay++
 	}
 	virtualFile1.Validate(t)
 }
