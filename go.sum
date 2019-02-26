@@ -1,0 +1,4 @@
+github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/google/gofountain v0.0.0-20160820054803-4928733085e9 h1:Ngb7dbv9x/c5wWGpGxicH4iN8g90++AcRjwjHSllofA=
+github.com/google/gofountain v0.0.0-20160820054803-4928733085e9/go.mod h1:5K3gm9YuA6H5iBSG5JugS+7xTT0fK+E5zf8On8bgz1w=
